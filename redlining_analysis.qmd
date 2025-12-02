@@ -1,0 +1,216 @@
+---
+title: "Insurance redlining analysis"
+author: "Clay Ford"
+date: "today"
+format: 
+  html:
+    embed-resources: true
+---
+
+Redlining refers to the practice of refusing to issue insurance to certain types of people or within some geographic area. In the 1970s, the US Commission on Civil Rights examined charges by Chicago community organizations that insurance companies were redlining their neighborhoods. A FAIR plan (Fair Access to Insurance Requirements) was offered by the city of Chicago as a default policy to homeowners rejected by the voluntary market. This serves as a measure of insurance availability. Of interest is the extent to which racial composition of a community affects underwriting practices after controlling for factors that legitimately affect underwriting such as theft and fire damage.
+
+Data was collected for 47 zip codes.
+
+![Zip Code Areas of Chicago](zipcode_map.jpg)
+
+Variable definitions:
+
+- race: racial composition in percent minority
+- fire: fires per 100 housing units
+- theft: theft per 1000 population
+- age: percent of housing units built before 1939
+- involact: new FAIR plan policies and renewals per 100 housing units (involuntary market activity)
+- income: median family income in thousands of dollars
+
+Row names are zip codes. 
+
+```{r}
+chicago <- readRDS("chicago.rds")
+head(chicago)
+```
+
+Numerical summaries of data. 
+
+```{r}
+summary(chicago)
+```
+
+What proportion are zeroes?
+
+```{r}
+sum(chicago$involact == 0)
+mean(chicago$involact == 0)
+```
+
+Pairwise correlations
+
+```{r}
+round(cor(chicago), 2)
+```
+
+
+Some pairwise scatter plots. We see some outliers and possibly influential points.
+
+```{r}
+#| message: false
+library(ggplot2)
+ggplot(chicago) +
+  aes(x = race, y = involact) +
+  geom_point() +
+  stat_smooth()
+```
+
+```{r}
+#| message: false
+
+ggplot(chicago) +
+  aes(x = fire, y = involact) +
+  geom_point() +
+  stat_smooth()
+```
+
+
+```{r}
+#| message: false
+ggplot(chicago) +
+  aes(x = theft, y = involact) +
+  geom_point() +
+  stat_smooth()
+```
+
+```{r}
+#| message: false
+ggplot(chicago) +
+  aes(x = income, y = involact) +
+  geom_point() +
+  stat_smooth()
+```
+
+
+Comparing race with fire.
+
+```{r}
+#| message: false
+ggplot(chicago) +
+  aes(x = race, y = fire) +
+  geom_point() +
+  stat_smooth()
+
+```
+
+Comparing race and theft.
+
+```{r}
+#| message: false
+
+ggplot(chicago) + 
+  aes(x = race, y = theft) + 
+  geom_point() +
+  stat_smooth()
+```
+
+
+## Full model and diagnostics
+
+
+Model involact (new and renewed FAIR plans per 100 housing units) as function of race controlling for fire, theft, age of home, and median family income. Log transform income since it's better to consider it on a multiplicative scale instead of an additive scale.
+
+```{r}
+m1 <- lm(involact ~ race + fire + theft + age + log(income), 
+         data = chicago)
+summary(m1)
+```
+
+
+## Sensitivity analysis
+
+How robust is our conclusion to the choice of covariates?
+
+```{r}
+listcombo <- unlist(sapply(0:4, function(x)combn(1:4, x, simplify = FALSE)),
+                    recursive = FALSE)
+predterms <- lapply(listcombo, function(x)
+   paste(c("race", c("fire", "theft", "age", "log(income)")[x]),
+   collapse = " + "))
+coefm <- matrix(NA, 16, 2)
+for(i in 1:16){
+   lmi <- lm(as.formula(paste("involact ~ ", predterms[[i]])),
+         data = chicago)
+   # extract race coefficient and p-value
+   coefm[i,] <- summary(lmi)$coef[2, c(1, 4)] 
+}
+rownames(coefm) <- predterms
+colnames(coefm) <- c("race", "pvalue")
+round(coefm, 4)
+```
+
+Pretty robust. It doesn't matter what combination of covariates we control for, the race coefficient is positive. 
+
+Does our conclusion depend on a few cases? Do we have influential observations?
+
+```{r}
+plot(m1, which = 5)
+```
+
+High theft and fire zip codes.
+
+```{r}
+chicago["60607",]
+```
+
+Fit a model without this observation.
+
+```{r}
+i <- which(rownames(chicago) == "60607")
+m2 <- lm(involact ~ race + fire + theft + age + log(income),
+         data = chicago, subset = -i)
+summary(m2)
+```
+
+Compare models.
+
+```{r}
+car::compareCoefs(m1, m2)
+```
+
+Conclusion seems robust to the exclusion of one data point.
+
+## Discussion
+
+Race coefficient is statistically significant but small. Every 10 percent increase in the minority composition leads to about a 0.09 increase in FAIR plan policies and renewals per 100 housing units
+
+The predicted difference between 0% and 100% minority is about 1.
+
+```{r}
+#| message: false
+library(emmeans)
+emmeans(m1, specs = "race", at = list(race = c(0, 100)))
+```
+
+We can visualize this association with an effect plot.
+
+```{r}
+#| message: false
+library(ggeffects)
+ggpredict(m1, terms = "race") |> 
+  plot(show_data = TRUE)
+```
+
+The analysis is also at the aggregate level. The results may not hold at the individual level. 
+
+
+## Session information
+
+```{r echo = FALSE, results='asis'}
+summary(report::report(sessionInfo()))
+```
+
+
+## References
+
+- Faraway J (2025). _faraway: Datasets and Functions for Books by Julian  Faraway_. doi:10.32614/CRAN.package.faraway <https://doi.org/10.32614/CRAN.package.faraway>, R package version 1.0.9, <https://CRAN.R-project.org/package=faraway>.
+- Faraway J (2025). _Linear Models with R_, 3rd Ed. CRC Press. (Chapter 13)
+- Lenth R (2025). _emmeans: Estimated Marginal Means, aka Least-Squares Means_. doi:10.32614/CRAN.package.emmeans <https://doi.org/10.32614/CRAN.package.emmeans>, R package version 1.11.2-8, <https://CRAN.R-project.org/package=emmeans>.
+- R Core Team (2025). _R: A Language and Environment for Statistical  Computing_. R Foundation for Statistical Computing, Vienna, Austria. <https://www.R-project.org/>.
+- U.S. Commission on Civil Rights (1979), Insurance Redlining: Fact not Fiction. A report prepared by the Illinois, Indiana, Michigan, Minnesota, Ohio, and Wisconsin Advisory Committees to the U.S. Commission on Civil Rights, Washington, D.C. <https://www.usccr.gov/files/historical/1979/79-004.pdf>.
+- Wickham H (2016). _ggplot2: Elegant Graphics for Data Analysis_. Springer-Verlag New York.
