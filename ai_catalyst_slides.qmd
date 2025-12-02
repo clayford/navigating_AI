@@ -1,0 +1,421 @@
+---
+title: "Navigating AI in Data Analysis: Suggestions and Cautions"
+author: "Clay Ford"
+date: "2025-11-06"
+format: 
+  revealjs:
+    embed-resources: true
+    smaller: true
+    scrollable: true
+    slide-number: true
+    incremental: true 
+    theme: simple
+    include-in-header:
+      - text: |
+          <style>
+          #title-slide .title {
+          font-size: 2.5em; /* Adjust the size as needed */
+          }
+          </style>
+---
+
+## Doing hard stuff
+
+- AI can be great for helping us do hard stuff we need to do, but that we either don't want to do or that we're not sure how to do right:  
+
+    * letter of recommendation
+    * write a regular expression
+    * translate R code to Python
+    
+- In all examples, I can verify that an AI solution works. 
+
+- For research purposes, statistics and data analysis can qualify as "hard stuff we need to do but we're not sure how to do right."
+
+- Can ask AI for help with stats, but how do you verify if it's correct? 
+
+
+## Prevailing AI advice for statistical analysis
+
+::: {.nonincremental}
+Mostly safe AI tasks...
+
+- generating computer code for data wrangling
+- explaining computer code
+- debugging computer code
+
+Potentially dangerous AI tasks...
+
+- planning a study (power and sample size)
+- choosing a statistical analysis
+- generating computer code for statistical analysis
+- interpreting analysis results
+
+I will demonstrate some of the dangers today. 
+:::
+
+## The chosen tools
+
+::: {.nonincremental}
+- I present results from Claude and Copilot
+- I have a paid subscription to Claude (courtesy of UVA Library)
+- UVA provides a secure and protected Copilot license (includes contractual data protection of university information)
+- I don't endorse these tools or claim they are better than others available
+- I encourage you to try the following examples with other AI tools
+:::
+
+## Statistical planning of study
+
+Two most asked questions:
+
+- "How many observations do I need?"
+- "I'll have X observations. What's the power of my study?"
+
+## Planning example using Claude
+
+![](img/claude_anova_01.png)
+
+## Claude gives wrong answer
+
+![](img/claude_anova_02.png)
+
+## Right answer using R
+
+```{r echo=TRUE}
+library(pwr)
+pwr.anova.test(k = 3, f = 0.25, sig.level = 0.01, power = 0.9)
+```
+
+Notice this is a _much larger_ sample size, over 4 times larger than what Claude tells us.
+
+## Asking Claude for R code
+
+![](img/claude_anova_03.png)
+
+## Claude gives correct R code
+
+```{r echo=TRUE}
+# Parameters
+k <- 3          # number of groups (fuel types)
+alpha <- 0.01   # significance level
+power <- 0.90   # desired power
+f <- 0.25       # Cohen's f for medium effect size
+
+# Calculate sample size per group
+result1 <- pwr.anova.test(k = k, f = f, sig.level = alpha, power = power)
+result1
+```
+
+
+## But promises the wrong answer
+
+![](img/claude_anova_04.png)
+
+The code confirms you need 95 trials per fuel type, not 22.
+
+## Planning example using Claude
+
+![](img/claude_t-test_01.png)
+
+Again, Claude gives wrong answer. Power is too high.
+
+## Right answer using R
+
+```{r echo=TRUE}
+library(pwr)
+pwr.t.test(n = 30, d = 0.5, sig.level = 0.05, 
+           type = "two.sample", alternative = "two.sided")
+```
+
+Power is 0.48. This study is _much less powerful_ than Claude states.
+
+## Claude gets more wrong
+
+The last part of its answer:
+
+![](img/claude_t-test_02.png)
+
+This is also wrong. For 80% power we need 64 students per group, not 32. 
+
+
+## Right answer using R
+
+```{r echo=TRUE}
+pwr.t.test(d = 0.5, sig.level = 0.05, power = 0.8,
+           type = "two.sample", alternative = "two.sided")
+```
+
+
+
+
+## Following up with Claude
+
+![](img/claude_t-test_03.png)
+
+![](img/claude_t-test_04.png)
+
+No, it used the wrong sample size per group (60 instead of 30).
+
+## Planning example using Claude
+
+![](img/claude_pred_mod_01.png)
+
+This is wrong. Much too big by a factor of 5.
+
+## Right answer using R
+
+```{r echo=TRUE}
+library(pmsampsize)
+pmsampsize(type = "b", csrsquared = 0.288, parameters = 24, prevalence = 0.17)
+```
+
+Minimum sample size is about 667.
+
+
+## Asking Claude for R code
+
+Claude gives the right code (almost). The `rsquared` argument should be `csrsquared`.
+
+![](img/claude_pred_mod_02.png)
+
+## Claude means well
+
+After providing mostly correct R code, says it "should give you n = 3,661 as the minimum sample size." That's wrong, but everything else is correct.
+
+![](img/claude_pred_mod_03.png)
+
+## Planning example using Copilot
+
+![](img/copilot_t-test.png)
+
+This is correct!
+
+## Verify Copilot calculation
+
+```{r echo=TRUE}
+power.t.test(delta = 0.75, sd = 2.25, sig.level = 0.01,
+             power = 0.9, type = "two.sample", alternative = "two.sided")
+```
+
+
+## Planning example using Copilot
+
+![](img/copilot_prop-test.png)
+
+This is very wrong. That's 4 times too high.
+
+## Right answer using R
+
+```{r echo=TRUE}
+pwr.2p.test(h = ES.h(p1 = 0.3, p2 = 0.4),
+            sig.level = 0.05, 
+            power = 0.90, 
+            alternative = "two.sided")
+```
+
+## Asking Copilot for R code
+
+![](img/copilot_prop-test_02.png)
+
+This is the correct code.
+
+## Planning example using Copilot
+
+![](img/copilot_logit_01.png)
+
+This is wrong.
+
+## Right answer using R
+
+An odds ratio of 3 implies P(diabetes|X = 1) = 0.25.
+
+```{r echo=TRUE}
+library(WebPower)
+wp.logistic(n = NULL, p0 = 0.1, p1 = 0.25,
+            alpha = 0.05, power = 0.8,
+            alternative = "two.sided",
+            family = "Bernoulli",
+            parameter = 0.3)
+```
+
+We need to sample about 220 subjects.
+
+## Asking Copilot for R code
+
+![](img/copilot_logit_02.png)
+
+This is also wrong. Right package but nonexistent function.
+
+## Corrected R code
+
+```{r echo=TRUE, message=FALSE}
+library(powerMediation)
+SSizeLogisticBin(p1 = 0.1, p2 = 0.25, B = 0.3, 
+                 alpha = 0.05, power = 0.8)
+```
+
+I had to read the documentation of the `powerMediation` package, find the correct function (`SSizeLogisticBin()`), and then figure out how to use the function.
+
+
+## Copilot wants to help
+
+After providing a wrong answer and wrong R code, it asks the following:
+
+![](img/copilot_logit_03.png)
+
+If it couldn't handle a simple logistic regression study plan, why would I trust it with a more complex plan?
+
+Let's take it up on its offer.
+
+## Study plan with covariates
+
+![](img/copilot_logit_04.png)
+
+It proceeded to supply sound advice.
+
+## Copilot R code for study plan with covariates
+
+![](img/copilot_logit_05.png)
+
+The `powerLogisticBin()` does exist, but does not allow adjustment for covariates. Also the example still uses the nonexistent `ssize.logistic()` function.
+
+## Study planning with AI
+
+::: {.nonincremental}
+Friendly advice:
+
+- Request code
+- Verify code works
+- Verify code is correct, perhaps consulting with an expert, textbook, or journal article
+:::
+
+
+## Choosing a statistical analysis
+
+::: {.nonincremental}
+Depends on...
+
+- The research question
+- Subject-matter expertise
+- The outcome(s) of interest and how it's measured
+- The amount of data available
+- The researcher's comfort level with statistics
+:::
+
+## Analysis example
+
+In the 1970s, the US Commission on Civil Rights examined charges by Chicago community organizations that insurance companies were redlining their neighborhoods.
+
+To what extent does racial composition of a community affect underwriting practices after controlling for factors that legitimately affect underwriting such as theft and fire damage?
+
+United States Commission on Civil Rights 1979 report:  
+[Insurance Redlining: Fact Not Fiction](https://www.usccr.gov/files/historical/1979/79-004.pdf)
+
+## Analysis without AI
+
+Julian Faraway reanalyzes this data in his book _Linear Modeling with R_ (Ch 13).
+
+A slightly modified version of this analysis is available at the following link:
+
+<https://static.lib.virginia.edu/statlab/materials/redlining_analysis.html>
+
+
+## Letting AI guide the analysis
+
+Copilot offers to analyze data for you.
+
+![](img/copilot_upload_files.png)
+
+Let's give it a try!
+
+## Letting Copilot guide the analysis
+
+::: {.nonincremental}
+When I let Copilot analyze the insurance redlining data:
+
+- visualized zipcode like a number
+- didn't suggest log-transforming income
+- suggested logistic regression and decision trees as a possibility 
+- offered to fit interactions (sample size is too small)
+- miscalculated VIFs
+- offered to drop variables with high VIFs, which didn't need to be done
+- offered to do stepwise regression, which is [bad](https://statmodeling.stat.columbia.edu/2014/06/02/hate-stepwise-regression/) [statistical](https://www.stata.com/support/faqs/statistics/stepwise-regression-problems/) [practice](https://journalofbigdata.springeropen.com/articles/10.1186/s40537-018-0143-6)
+- did not preserve model after stepwise regression
+- dropped almost 10% of the data because it was moderately influential
+- identified fire as the "strong" predictor when it's simply a covariate
+:::
+
+## Letting Copilot assist with the analysis
+
+::: {.nonincremental}
+Instead of letting Copilot guide the analysis, ask it to help with specific tasks:
+
+- help automate the creation of plots
+- help with code to test all 16 combinations of covariates
+:::
+
+## Statistical analysis with AI
+
+::: {.nonincremental}
+Friendly advice:
+
+- Give AI small, explicit tasks
+- Request code, verify it works
+- If requesting code for running analysis, be sure it's the correct analysis
+- Disable or discourage suggestions for further analysis, or exercise healthy skepticism when it makes suggestions
+
+General AI advice:
+
+- Provide context for the analysis
+- Run multiple chats to check consistency
+- Ask for sources and then check the sources (sometimes the summaries it gives don’t match what’s actually in the source that it cites)
+- Acknowledge the use of AI in your final paper, report or presentation
+:::
+
+## Final thought
+
+> "...we strongly warn about the non-skeptical use of LLMs. Relying naively on the correctness of their output is irresponsible, and statistical studies can be seriously corrupted. Consequently, expert knowledge from biostatisticians remains indispensable, along with maintaining a questioning stance towards AI outputs."
+
+Dobler, et al. (2025). "ChatGPT as a Tool for Biostatisticians: A Tutorial on Applications, Opportunities, and Limitations," _Statistics in Medicine_.
+
+## Workshop complete
+
+For statistics help, contact UVA Library StatLab: <statlab@virginia.edu>
+
+Thank you to Jenn Huck, Hyeseon Seo, Lauren Brideau, and Ethan Kadiyala for suggestions that improved this presentation!
+
+<br><br><br><br><br>
+<br><br><br>
+
+![](img/by-nc.png)  
+This work is licensed under a [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by-nc/4.0/).
+    
+    
+
+
+## References
+
+::: {style="font-size: 60%;"}
+::: {.nonincremental}
+- Champely S (2020). _pwr: Basic Functions for Power  Analysis_. <https://doi.org/10.32614/CRAN.package.pwr>, R package, version 1.3-0, <https://CRAN.R-project.org/package=pwr>.
+
+- Crespi C (2025). _Power and Sample Size in R_. Chapman & Hall. <https://powerandsamplesize.org/>
+
+- Dobler D, Binder H, Boulesteix AL, et al. (2025). "ChatGPT as a Tool for Biostatisticians: A Tutorial on Applications, Opportunities, and Limitations," Statistics in Medicine 44, no. 23-24: e70263, <https://doi.org/10.1002/sim.70263>.
+
+- Ensor J (2023). _pmsampsize: Sample Size for Development of a Prediction Model_. doi:10.32614/CRAN.package.pmsampsize <https://doi.org/10.32614/CRAN.package.pmsampsize>, R package version 1.1.3, <https://CRAN.R-project.org/package=pmsampsize>.
+
+- Faraway J (2025). _Linear Models with R_, 3rd Ed. CRC Press. (Chapter 13)
+
+- Qiu W (2021). _powerMediation: Power/Sample Size Calculation for Mediation Analysis_. doi:10.32614/CRAN.package.powerMediation  <https://doi.org/10.32614/CRAN.package.powerMediation>, R package version 0.3.4, <https://CRAN.R-project.org/package=powerMediation>.
+
+- R Core Team (2025). _R: A Language and Environment for Statistical Computing_. R Foundation for Statistical Computing, Vienna, Austria. <https://www.R-project.org/>.
+  
+- Schwarz J (2025). The use of generative AI in statistical data analysis and its impact on teaching statistics at universities of applied sciences, Teach. Stat. 47, 118–128, <https://doi.org/10.1111/test.12398>.
+
+- U.S. Commission on Civil Rights (1979), Insurance Redlining: Fact not Fiction. A report prepared by the Illinois, Indiana, Michigan, Minnesota, Ohio, and Wisconsin Advisory Committees to the U.S. Commission on Civil Rights, Washington, D.C. <https://www.usccr.gov/files/historical/1979/79-004.pdf>.
+
+- Zhang Z, Mai Y (2023). _WebPower: Basic and Advanced Statistical Power  Analysis_. doi:10.32614/CRAN.package.WebPower  <https://doi.org/10.32614/CRAN.package.WebPower>, R package version 0.9.4, <https://CRAN.R-project.org/package=WebPower>.
+
+- Zhu B, (2025). "Biostatisticians Meet AI: Navigating Shifts While Preserving Principles," Statistics in Medicine 44, no. 20-22: e70271, <https://doi.org/10.1002/sim.70271>.
+:::
+:::
