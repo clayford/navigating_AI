@@ -3,7 +3,7 @@
 Slides for a workshop delivered at the University of Virginia on November 6, 2025.
 
 Slides can be viewed at the following URL:  
-[https://static.lib.virginia.edu/statlab/materials/al_catalyst_slides.html](https://static.lib.virginia.edu/statlab/materials/al_catalyst_slides.html)
+[https://static.lib.virginia.edu/statlab/materials/al_catalyst_slides.html](https://static.lib.virginia.edu/statlab/materials/ai_catalyst_slides.html)
 
 Workshop description:
 
